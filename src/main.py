@@ -4,6 +4,7 @@ os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1" 
 
 import argparse
+import sys
 import json
 import hashlib
 import psutil
@@ -17,7 +18,10 @@ from termcolor import cprint, colored
 
 warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub")
 
-from fastembed import TextEmbedding
+try:
+    from fastembed import TextEmbedding
+except ImportError:
+    sys.exit(1)
 
 
 MODELS = ['small', 'bge-s', 'bge-m', 'bge-l', 'minilm', 'multi', 'code', 'nomic']
@@ -65,6 +69,8 @@ def get_model_name(size):
         'bge-m': 'BAAI/bge-base-en-v1.5',
         'bge-l': 'BAAI/bge-large-en-v1.5',
         'minilm': 'sentence-transformers/all-MiniLM-L6-v2',
+        'multi': 'intfloat/multilingual-e5-large',
+        'code': 'jinaai/jina-embeddings-v2-base-code', 
         'nomic': 'nomic-ai/nomic-embed-text-v1.5',
     }
     return models.get(size, 'BAAI/bge-small-en-v1.5')
@@ -121,10 +127,13 @@ def manage_cache(purge_flag, cache_dir):
         try:
             shutil.rmtree(cache_dir)
             log_step("Cache purged", "success")
-        except:
-            pass
+            return True
+        except Exception as e:
+            log_step(f"Purge failed: {e}", "error")
+            return False
     elif cache_dir:
         cleanup_stale_cache(cache_dir)
+        return False
 
 
 def create_chunks(lines, args):
@@ -235,6 +244,9 @@ def load_index_from_cache(vec_path, meta_path):
 
 
 def build_and_save_index(chunks, model, vec_path, meta_path):
+    # Double check directory exists before saving (in case it was deleted externally)
+    os.makedirs(os.path.dirname(vec_path), exist_ok=True)
+
     threads, batch_size = get_optimal_execution_params()
     texts = [c["text_embed"] for c in chunks]
     
@@ -300,7 +312,11 @@ def main():
     model_name = get_model_name(args.model)
     vec_path, meta_path, cache_dir = get_cache_paths(args.file, model_name, args.chunk_size, args.overlap)
     
-    manage_cache(args.purge, cache_dir)
+    if args.purge:
+        manage_cache(True, cache_dir)
+        return
+    else:
+        manage_cache(False, cache_dir)
 
     threads, _ = get_optimal_execution_params()
     try:
@@ -312,7 +328,7 @@ def main():
     index = None
     chunks = []
     
-    if not args.purge and vec_path:
+    if vec_path:
         index, chunks = load_index_from_cache(vec_path, meta_path)
         if index:
             log_step("Loaded from cache", "success")
