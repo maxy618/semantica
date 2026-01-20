@@ -9,7 +9,7 @@ description = "Semantic search engine tool"
 requires-python = ">=3.9"
 dependencies = [
     "numpy",
-    "faiss-cpu", #faiss-gpu
+    "faiss-cpu",  # faiss-gpu
     "fastembed",
     "spacy",
     "termcolor",
