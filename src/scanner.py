@@ -1,0 +1,168 @@
+import os
+import spacy
+import psutil
+from config import IGNORE_DIRS
+from reader import FileReader
+from utils import log, log_file_error
+
+
+def get_all_files(path):
+    reader = FileReader()
+    
+    if os.path.isfile(path):
+        return [path] if reader.is_supported(path) else []
+    
+    file_list = []
+    for root, dirs, filenames in os.walk(path):
+        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith('.')]
+        
+        for filename in filenames:
+            if filename.startswith('.'):
+                continue
+                
+            full_path = os.path.join(root, filename)
+            if reader.is_supported(full_path):
+                file_list.append(full_path)
+            
+    return file_list
+
+
+def ensure_spacy(model_name):
+    if not spacy.util.is_package(model_name):
+        log(f"Downloading Spacy model: {model_name}...", "warn")
+        spacy.cli.download(model_name)
+    
+    nlp = spacy.load(model_name, disable=['ner', 'parser', 'tagger', 'lemmatizer'])
+    
+    if "sentencizer" not in nlp.pipe_names:
+        nlp.add_pipe("sentencizer")
+        
+    nlp.max_length = 1_500_000
+    return nlp
+
+
+def check_ram_safety():
+    mem = psutil.virtual_memory()
+    if mem.available < 500 * 1024 * 1024 or mem.percent > 95:
+        return False
+    return True
+
+
+def chunk_code(content, args):
+    chunks = []
+    lines = content.splitlines()
+    total_lines = len(lines)
+    
+    i = 0
+    while i < total_lines:
+        chunk_lines = []
+        current_size = 0
+        start_line = i
+        
+        while i < total_lines:
+            line = lines[i]
+            line_len = len(line) + 1 
+            
+            if current_size + line_len > args.chunk_size and chunk_lines:
+                break
+                
+            chunk_lines.append(line)
+            current_size += line_len
+            i += 1
+            
+        text = "\n".join(chunk_lines)
+        if text.strip():
+            chunks.append({
+                "text_embed": text,
+                "text_raw": text,
+                "lines": f"{start_line + 1}-{i}",
+                "type": "code"
+            })
+            
+        step = max(1, int(len(chunk_lines) * (1 - args.overlap)))
+        if step < len(chunk_lines):
+            i = start_line + step
+            
+    return chunks
+
+
+def chunk_text(content, args, nlp):
+    try:
+        doc = nlp(content)
+        sentences = [s.text for s in doc.sents]
+    except Exception:
+        return chunk_code(content, args)
+    
+    chunks = []
+    i = 0
+    while i < len(sentences):
+        current_chunk = []
+        current_len = 0
+        
+        j = i
+        while j < len(sentences):
+            sent = sentences[j]
+            if current_len + len(sent) > args.chunk_size and current_chunk:
+                break
+            
+            current_chunk.append(sent)
+            current_len += len(sent)
+            j += 1
+            
+        text = " ".join(current_chunk)
+        if text.strip():
+            chunks.append({
+                "text_embed": text,
+                "text_raw": text,
+                "lines": "N/A",
+                "type": "text"
+            })
+            
+        step = max(1, int((j - i) * (1 - args.overlap)))
+        i += step
+        
+    return chunks
+
+
+def process_files(file_paths, root_path, args):
+    reader = FileReader()
+    all_chunks = []
+    nlp = None
+    
+    has_text = any(reader.get_file_type(fp) == 'text' for fp in file_paths)
+    if has_text:
+        try:
+            nlp = ensure_spacy(args.spacy_model)
+        except Exception as e:
+            log(f"Spacy init failed: {e}", "error")
+
+    for fpath in file_paths:
+        data = reader.read(fpath)
+        if not data: 
+            continue
+            
+        if "error" in data:
+            log_file_error(fpath, data['error'])
+            continue
+            
+        content = data["content"]
+        ctype = data["type"]
+        
+        if ctype == 'text' and nlp:
+            if len(content) > nlp.max_length:
+                nlp.max_length = len(content) + 1_000_000  # ummmm
+            
+            if not check_ram_safety():
+                file_chunks = chunk_code(content, args)
+            else:
+                file_chunks = chunk_text(content, args, nlp)
+        else:
+            file_chunks = chunk_code(content, args)
+            
+        rel_path = os.path.relpath(fpath, root_path) if os.path.isdir(root_path) else os.path.basename(fpath)
+            
+        for c in file_chunks:
+            c['path'] = rel_path
+            all_chunks.append(c)
+            
+    return all_chunks
