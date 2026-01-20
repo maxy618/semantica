@@ -20,7 +20,6 @@ def get_args():
     parser.add_argument('--purge', action='store_true')
     parser.add_argument('-m', '--model', type=str, default=config.DEFAULT_ARGS['model'])
     parser.add_argument('-rm', '--rerank_model', type=str,default=config.DEFAULT_ARGS['rerank_model'])
-    parser.add_argument('-sm', '--spacy_model', type=str, default=config.DEFAULT_ARGS['spacy_model'])
     parser.add_argument('--rerank', action='store_true', help="Enable reranking step (disabled by default)")
     parser.add_argument('-f', '--factor', type=int, default=config.DEFAULT_ARGS['rerank_factor'])
     
@@ -43,7 +42,6 @@ def main():
                     ext = '.' + ext
                 ignore_exts.add(ext)
 
-
     try:
         main_model = config.MODELS_MAPPING.get(args.model, args.model)
         rerank_model = config.RERANK_MODELS_MAPPING.get(args.rerank_model, args.rerank_model)
@@ -59,7 +57,6 @@ def main():
         engine.manage_cache(False, cache_dir)
         
         if not engine.load_index(vec_path, meta_path):
-            # --- ПЕРЕДАЕМ ignore_exts В ФУНКЦИЮ ---
             files = get_all_files(args.path, ignore_exts=ignore_exts)
             
             if not files:

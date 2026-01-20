@@ -1,9 +1,9 @@
 import os
-import spacy
 import psutil
 from config import IGNORE_DIRS
 from reader import FileReader
 from utils import log, log_file_error
+import xx_sent_ud_sm 
 
 
 def get_all_files(path, ignore_exts=None):
@@ -35,20 +35,6 @@ def get_all_files(path, ignore_exts=None):
                 file_list.append(full_path)
             
     return file_list
-
-
-def ensure_spacy(model_name):
-    if not spacy.util.is_package(model_name):
-        log(f"Downloading Spacy model: {model_name}...", "warn")
-        spacy.cli.download(model_name)
-    
-    nlp = spacy.load(model_name, disable=['ner', 'parser', 'tagger', 'lemmatizer'])
-    
-    if "sentencizer" not in nlp.pipe_names:
-        nlp.add_pipe("sentencizer")
-        
-    nlp.max_length = 1_500_000
-    return nlp
 
 
 def check_ram_safety():
@@ -153,9 +139,11 @@ def process_files(file_paths, root_path, args):
     has_text = any(reader.get_file_type(fp) == 'text' for fp in file_paths)
     if has_text:
         try:
-            nlp = ensure_spacy(args.spacy_model)
+            nlp = xx_sent_ud_sm.load()
+            nlp.add_pipe("sentencizer")
+            nlp.max_length = 1_500_000
         except Exception as e:
-            log(f"Spacy init failed: {e}", "error")
+            log(f"Spacy load failed: {e}", "error")
 
     for fpath in file_paths:
         data = reader.read(fpath)

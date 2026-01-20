@@ -4,7 +4,6 @@ DEFAULT_ARGS = {
     'overlap': 0.5,
     'rerank_factor': 5,
     'rerank_model': 'jina-v2',
-    'spacy_model': 'xx_sent_ud_sm',
     'model': 'bge-s',
 }
 
