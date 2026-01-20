@@ -1,6 +1,7 @@
 from utils import setup_system, log, print_result
 setup_system()
 import os
+import multiprocessing
 import argparse
 import sys
 from termcolor import cprint
@@ -104,4 +105,5 @@ def main():
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     main()
