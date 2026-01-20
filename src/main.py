@@ -16,17 +16,11 @@ def get_args():
     parser.add_argument('-k', '--k', type=int, default=config.DEFAULT_ARGS['k'])
     parser.add_argument('-c', '--chunk_size', type=int, default=config.DEFAULT_ARGS['chunk_size'])
     parser.add_argument('-o', '--overlap', type=float, default=config.DEFAULT_ARGS['overlap'])
+    parser.add_argument('-i', '--ignore', type=str, default="", help="Comma separated extensions to ignore (e.g. csv,txt)")
     parser.add_argument('--purge', action='store_true')
-    
-    parser.add_argument('-m', '--model', type=str,
-                       default=config.DEFAULT_ARGS['model'])
-    
-    parser.add_argument('-rm', '--rerank_model', type=str,
-                       default=config.DEFAULT_ARGS['rerank_model'])
-                       
-    parser.add_argument('-sm', '--spacy_model', type=str, 
-                       default=config.DEFAULT_ARGS['spacy_model'])
-
+    parser.add_argument('-m', '--model', type=str, default=config.DEFAULT_ARGS['model'])
+    parser.add_argument('-rm', '--rerank_model', type=str,default=config.DEFAULT_ARGS['rerank_model'])
+    parser.add_argument('-sm', '--spacy_model', type=str, default=config.DEFAULT_ARGS['spacy_model'])
     parser.add_argument('--rerank', action='store_true', help="Enable reranking step (disabled by default)")
     parser.add_argument('-f', '--factor', type=int, default=config.DEFAULT_ARGS['rerank_factor'])
     
@@ -40,11 +34,22 @@ def main():
         log(f"Path not found: {args.path}", "error")
         return
 
+    ignore_exts = set()
+    if args.ignore:
+        for ext in args.ignore.split(','):
+            ext = ext.strip().lower()
+            if ext:
+                if not ext.startswith('.'):
+                    ext = '.' + ext
+                ignore_exts.add(ext)
+
+
     try:
         main_model = config.MODELS_MAPPING.get(args.model, args.model)
         rerank_model = config.RERANK_MODELS_MAPPING.get(args.rerank_model, args.rerank_model)
 
         engine = SearchEngine(main_model)
+        
         vec_path, meta_path, cache_dir = engine.get_cache_paths(args.path, args.chunk_size, args.overlap)
         
         if args.purge:
@@ -54,9 +59,11 @@ def main():
         engine.manage_cache(False, cache_dir)
         
         if not engine.load_index(vec_path, meta_path):
-            files = get_all_files(args.path)
+            # --- ПЕРЕДАЕМ ignore_exts В ФУНКЦИЮ ---
+            files = get_all_files(args.path, ignore_exts=ignore_exts)
+            
             if not files:
-                log("No files found", "error")
+                log("No files found (check path or ignored extensions)", "error")
                 return
 
             log(f"Processing {len(files)} files...", "info")

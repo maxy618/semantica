@@ -6,10 +6,16 @@ from reader import FileReader
 from utils import log, log_file_error
 
 
-def get_all_files(path):
+def get_all_files(path, ignore_exts=None):
+    if ignore_exts is None:
+        ignore_exts = set()
+        
     reader = FileReader()
     
     if os.path.isfile(path):
+        ext = os.path.splitext(path)[1].lower()
+        if ext in ignore_exts:
+            return []
         return [path] if reader.is_supported(path) else []
     
     file_list = []
@@ -18,6 +24,10 @@ def get_all_files(path):
         
         for filename in filenames:
             if filename.startswith('.'):
+                continue
+                
+            ext = os.path.splitext(filename)[1].lower()
+            if ext in ignore_exts:
                 continue
                 
             full_path = os.path.join(root, filename)

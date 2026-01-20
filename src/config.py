@@ -39,7 +39,7 @@ FILE_TYPES = {
     'text': {
         '.txt', '.md', '.markdown', '.rst',
         '.pdf', '.docx', '.doc', '.odt', '.rtf', 
-        '.tsv', '.log', '.tex'
+        '.tsv', '.log', '.tex', '.csv'
     },
     'code': {
         '.py', '.pyw', '.js', '.jsx', '.ts', '.tsx',
