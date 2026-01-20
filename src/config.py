@@ -1,6 +1,6 @@
 DEFAULT_ARGS = {
     'k': 3,
-    'chunk_size': 300,
+    'chunk_size': 500,
     'overlap': 0.5,
     'rerank_factor': 5,
     'rerank_model': 'jina-v2',
