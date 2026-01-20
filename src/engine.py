@@ -50,13 +50,13 @@ class SearchEngine:
         is_heavy = 'nomic' in self.model_name or 'large' in self.model_name
         
         if available_gb > 16:
-            batch_size = 64 if is_heavy else 128
+            batch_size = 128 if is_heavy else 256
         elif available_gb > 8:
-            batch_size = 32 if is_heavy else 64
+            batch_size = 64 if is_heavy else 128
         elif available_gb > 4:
-            batch_size = 16 if is_heavy else 32
+            batch_size = 32 if is_heavy else 64
         else:
-            batch_size = 4
+            batch_size = 16
             
         return batch_size, available_gb
 

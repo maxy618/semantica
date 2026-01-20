@@ -1,6 +1,6 @@
 DEFAULT_ARGS = {
     'k': 3,
-    'chunk_size': 200,
+    'chunk_size': 300,
     'overlap': 0.5,
     'rerank_factor': 5,
     'rerank_model': 'jina-v2',
@@ -38,8 +38,8 @@ IGNORE_DIRS = {
 FILE_TYPES = {
     'text': {
         '.txt', '.md', '.markdown', '.rst',
-        '.pdf', '.docx', '.doc', '.odt', '.rtf',
-        '.csv', '.tsv', '.log', '.tex'
+        '.pdf', '.docx', '.doc', '.odt', '.rtf', 
+        '.tsv', '.log', '.tex'
     },
     'code': {
         '.py', '.pyw', '.js', '.jsx', '.ts', '.tsx',
