@@ -3,7 +3,6 @@ import json
 import time
 import shutil
 import hashlib
-import psutil
 import numpy as np
 import faiss
 from fastembed import TextEmbedding
@@ -46,16 +45,20 @@ class SearchEngine:
 
     def get_safe_batch_size(self):
         """works on my machine"""
-        mem = psutil.virtual_memory()
-        available = mem.available
-        limit = available * 0.5
+        available_gb = self.available_gb
         
-        overhead_per_sample = 50 * 1024 * 1024
+        is_heavy = 'nomic' in self.model_name or 'large' in self.model_name
         
-        batch_size = int(limit / overhead_per_sample)
-        batch_size = max(1, min(32, batch_size))
-        
-        return batch_size, available / (1024 ** 3)
+        if available_gb > 16:
+            batch_size = 64 if is_heavy else 128
+        elif available_gb > 8:
+            batch_size = 32 if is_heavy else 64
+        elif available_gb > 4:
+            batch_size = 16 if is_heavy else 32
+        else:
+            batch_size = 4
+            
+        return batch_size, available_gb
 
 
     def get_cache_paths(self, input_path, chunk_size, overlap):
@@ -124,18 +127,24 @@ class SearchEngine:
         batch_size, free_mem = self.get_safe_batch_size()
         log(f"Encoding {len(chunks)} chunks (Batch: {batch_size}, Free RAM: {free_mem:.1f}GB)...", "info")
         
-        def text_generator():
-            for c in chunks:
-                yield c["text_embed"]
+        texts = [c["text_embed"] for c in chunks]
 
         embeddings_list = []
 
         try:
-            for vec in self.model.embed(text_generator(), batch_size=batch_size):
+            for vec in self.model.embed(texts, batch_size=batch_size):
                 embeddings_list.append(vec)
         except Exception as e:
-            log(f"Encoding failed: {e}", "error")
-            return
+            log(f"Encoding process crashed: {e}", "error")
+
+            log("Retrying with batch_size=1...", "warn")
+            embeddings_list = []
+            try:
+                for _, vec in enumerate(self.model.embed(texts, batch_size=1)):
+                    embeddings_list.append(vec)
+            except Exception as e2:
+                 log(f"Critical failure on chunk. Try cleaning your data or checking for minified files.", "error")
+                 return
 
         embeddings = np.array(embeddings_list, dtype=np.float32)
         

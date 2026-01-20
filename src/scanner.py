@@ -52,6 +52,7 @@ def chunk_code(content, args):
     chunks = []
     lines = content.splitlines()
     total_lines = len(lines)
+    HARD_LIMIT = args.chunk_size * 2
     
     i = 0
     while i < total_lines:
@@ -61,14 +62,19 @@ def chunk_code(content, args):
         
         while i < total_lines:
             line = lines[i]
+            if len(line) > HARD_LIMIT:
+                line = line[:HARD_LIMIT] + "..."
+            
             line_len = len(line) + 1 
             
             if current_size + line_len > args.chunk_size and chunk_lines:
                 break
-                
             chunk_lines.append(line)
             current_size += line_len
             i += 1
+            
+            if current_size >= args.chunk_size:
+                break
             
         text = "\n".join(chunk_lines)
         if text.strip():
@@ -78,10 +84,12 @@ def chunk_code(content, args):
                 "lines": f"{start_line + 1}-{i}",
                 "type": "code"
             })
-            
+    
         step = max(1, int(len(chunk_lines) * (1 - args.overlap)))
         if step < len(chunk_lines):
             i = start_line + step
+        else:
+            pass
             
     return chunks
 
@@ -102,6 +110,9 @@ def chunk_text(content, args, nlp):
         j = i
         while j < len(sentences):
             sent = sentences[j]
+            if len(sent) > args.chunk_size * 2:
+                sent = sent[:args.chunk_size * 2]
+
             if current_len + len(sent) > args.chunk_size and current_chunk:
                 break
             
@@ -147,11 +158,10 @@ def process_files(file_paths, root_path, args):
             
         content = data["content"]
         ctype = data["type"]
-        
+        if len(content) > 1_000_000:
+            ctype = 'code'
+
         if ctype == 'text' and nlp:
-            if len(content) > nlp.max_length:
-                nlp.max_length = len(content) + 1_000_000  # ummmm
-            
             if not check_ram_safety():
                 file_chunks = chunk_code(content, args)
             else:
