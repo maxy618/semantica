@@ -15,11 +15,16 @@ def get_models_dir():
     return config.MODELS_DIR
 
 
-def get_index_paths(input_path, model_name, chunk_size, overlap):
+def get_index_paths(input_path, model_name, chunk_size, overlap, ignore_exts=None):
     ensure_dirs()
     
+    if ignore_exts is None:
+        ignore_exts = set()
+
+    ignore_str = ",".join(sorted(list(ignore_exts)))
+    
     abs_path = os.path.abspath(input_path)
-    params_str = f"{abs_path}_{model_name}_{chunk_size}_{overlap}"
+    params_str = f"{abs_path}_{model_name}_{chunk_size}_{overlap}_{ignore_str}"
     params_hash = hashlib.md5(params_str.encode()).hexdigest()
     
     base_path = os.path.join(config.CACHE_DIR, params_hash)

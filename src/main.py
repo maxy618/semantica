@@ -94,7 +94,7 @@ def main():
     models_dir = storage.get_models_dir()
     
     engine = SearchEngine(main_model, threads, available_gb, models_dir)
-    vec_path, meta_path = storage.get_index_paths(args.path, main_model, args.chunk_size, args.overlap)
+    vec_path, meta_path = storage.get_index_paths(args.path, main_model, args.chunk_size, args.overlap, ignore_exts)
     
     if not engine.load_index(vec_path, meta_path):
         log("Cache miss. Scanning files...", "warn")
