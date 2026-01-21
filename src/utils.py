@@ -12,6 +12,8 @@ def setup_system():
     os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
     os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    os.environ["LOGURU_LEVEL"] = "CRITICAL"
+    logging.getLogger("fastembed").setLevel(logging.CRITICAL)
     warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub")
     logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
