@@ -216,6 +216,8 @@ To generate a standalone `.exe` that includes all dependencies (including machin
 
 **Note:** This command ensures that `fastembed`, `faiss`, and `spacy` models are correctly bundled.
 
+Windows
+
 ```powershell
 python -m nuitka --standalone --onefile --mingw64 `
     --include-package=src `
@@ -236,6 +238,32 @@ python -m nuitka --standalone --onefile --mingw64 `
     --nofollow-import-to=tkinter `
     --output-filename=semantica.exe `
     src/main.py
+```
+
+Linux
+
+```bash
+python3 -m nuitka \
+  --standalone \
+  --onefile \
+  --include-package=src \
+  --include-package=fastembed \
+  --include-package=faiss \
+  --include-package=pypdf \
+  --include-package=docx \
+  --include-package=xx_sent_ud_sm \
+  --include-package-data=xx_sent_ud_sm \
+  --spacy-language-model=xx_sent_ud_sm \
+  --include-package=tokenizers \
+  --include-package=onnxruntime \
+  --nofollow-import-to=matplotlib \
+  --nofollow-import-to=pandas \
+  --nofollow-import-to=scipy \
+  --nofollow-import-to=IPython \
+  --nofollow-import-to=pytest \
+  --nofollow-import-to=tkinter \
+  --output-filename=semantica \
+  src/main.py
 ```
 
 ---
