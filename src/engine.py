@@ -11,11 +11,12 @@ import storage
 
 
 class SearchEngine:
-    def __init__(self, model_name, threads, available_gb, cache_dir_models):
+    def __init__(self, model_name, threads, available_gb, cache_dir_models, chunk_size=500):
         self.model_name = model_name
         self.threads = threads
         self.available_gb = available_gb
         self.cache_dir_models = cache_dir_models
+        self.chunk_size = chunk_size
         self.model = None
         self.ranker = None
         self.ranker_name = None
@@ -104,15 +105,19 @@ class SearchEngine:
         is_heavy = 'nomic' in self.model_name or 'large' in self.model_name
         
         if available_gb > 16:
-            batch_size = 128 if is_heavy else 256
+            base_batch = 128 if is_heavy else 256
         elif available_gb > 8:
-            batch_size = 64 if is_heavy else 128
+            base_batch = 64 if is_heavy else 128
         elif available_gb > 4:
-            batch_size = 32 if is_heavy else 64
+            base_batch = 32 if is_heavy else 64
         else:
-            batch_size = 16
-            
-        return batch_size
+            base_batch = 16
+        
+        ref_chunk_size = 500
+        scale_factor = ref_chunk_size / max(1, self.chunk_size)
+        adjusted_batch = int(base_batch * scale_factor)
+        
+        return max(1, adjusted_batch)
 
 
     def load_index(self, vec_path, meta_path):
@@ -139,12 +144,12 @@ class SearchEngine:
         return False
 
 
-    def build_index(self, chunks, vec_path, meta_path):
+    def build_index(self, chunks, vec_path, meta_path, save_to_disk=True):
         self.load_model()
         self.chunks = chunks
         
         batch_size = self.get_safe_batch_size()
-        log(f"Encoding {len(chunks)} chunks (Batch: {batch_size})...", "info")
+        log(f"Encoding {len(chunks)} chunks (Batch: {batch_size}, ChunkSize: {self.chunk_size})...", "info")
         
         texts = [c["text_embed"] for c in chunks]
         embeddings_list = []
@@ -171,14 +176,18 @@ class SearchEngine:
         embeddings = np.array(embeddings_list, dtype=np.float32)
         faiss.normalize_L2(embeddings)
         
-        np.save(vec_path, embeddings)
-        with open(meta_path, 'w', encoding='utf-8') as f:
-            json.dump(chunks, f)
+        if save_to_disk:
+            np.save(vec_path, embeddings)
+            with open(meta_path, 'w', encoding='utf-8') as f:
+                json.dump(chunks, f)
         
         d = embeddings.shape[1]
         self.index = faiss.IndexFlatIP(d)
         self.index.add(embeddings)
-        log("Index built and saved to cache.", "success")
+        if save_to_disk:
+            log("Index built and saved to cache.", "success")
+        else:
+            log("Index built in memory (NoCache mode).", "success")
 
 
     def search(self, query, k, use_rerank=True, factor=5, rerank_model_name=None):

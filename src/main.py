@@ -26,6 +26,7 @@ def get_args():
     parser.add_argument('-rM', '--rerank_model', type=str,default=config.DEFAULT_ARGS['rerank_model'])
     parser.add_argument('--rerank', action='store_true', help="Enable reranking step (disabled by default)")
     parser.add_argument('-f', '--factor', type=int, default=config.DEFAULT_ARGS['rerank_factor'])
+    parser.add_argument('--nocache', action='store_true', help="Disable saving/loading vector index to disk")
     
     return parser.parse_args()
 
@@ -79,6 +80,8 @@ def main():
     log(f"Model: {main_model}", "system")
     if args.rerank:
         log(f"Reranker: {rerank_model}", "system")
+    if args.nocache:
+        log("Mode: No-Cache (Memory Only)", "system")
     print()
 
     ignore_exts = set()
@@ -93,11 +96,19 @@ def main():
     storage.cleanup_old_indexes()
     models_dir = storage.get_models_dir()
     
-    engine = SearchEngine(main_model, threads, available_gb, models_dir)
+    engine = SearchEngine(main_model, threads, available_gb, models_dir, chunk_size=args.chunk_size)
     vec_path, meta_path = storage.get_index_paths(args.path, main_model, args.chunk_size, args.overlap, ignore_exts)
     
-    if not engine.load_index(vec_path, meta_path):
-        log("Cache miss. Scanning files...", "warn")
+    index_loaded = False
+    if not args.nocache:
+        index_loaded = engine.load_index(vec_path, meta_path)
+
+    if not index_loaded:
+        if not args.nocache:
+            log("Cache miss. Scanning files...", "info")
+        else:
+            log("Scanning files (nocache)...", "info")
+            
         files = get_all_files(args.path, ignore_exts=ignore_exts, depth=args.depth)
         
         if not files:
@@ -111,7 +122,7 @@ def main():
             log("No content extracted", "error")
             return
             
-        engine.build_index(chunks, vec_path, meta_path)
+        engine.build_index(chunks, vec_path, meta_path, save_to_disk=not args.nocache)
 
     print()
     log("Starting search sequence...", "info")
