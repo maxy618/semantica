@@ -130,8 +130,11 @@ class SearchEngine:
                 
                 os.utime(vec_path, None)
                 os.utime(meta_path, None)
+                
+                log(f"Index loaded from cache: {len(self.chunks)} vectors ready.", "success")
                 return True
-            except:
+            except Exception as e:
+                log(f"Cache load failed: {e}", "warn")
                 return False
         return False
 
@@ -175,6 +178,7 @@ class SearchEngine:
         d = embeddings.shape[1]
         self.index = faiss.IndexFlatIP(d)
         self.index.add(embeddings)
+        log("Index built and saved to cache.", "success")
 
 
     def search(self, query, k, use_rerank=True, factor=5, rerank_model_name=None):
@@ -182,6 +186,7 @@ class SearchEngine:
         if not self.index:
             return []
 
+        log("Vectorizing query...", "info")
         initial_k = k * factor if use_rerank else k
         
         query_vec = list(self.model.embed([query]))[0].astype(np.float32)
@@ -196,9 +201,14 @@ class SearchEngine:
             if 0 <= idx < len(self.chunks):
                 candidates.append((score, self.chunks[idx]))
 
-        if not candidates or not use_rerank:
+        if not candidates:
+            return []
+
+        if not use_rerank:
+            log(f"Returning top {k} results (no rerank).", "info")
             return candidates[:k]
 
+        log(f"Retrieved {len(candidates)} candidates. Initializing reranker...", "info")
         self.load_ranker(rerank_model_name)
         
         if self.ranker:
@@ -212,6 +222,7 @@ class SearchEngine:
                     reranked.append((prob_score, candidates[idx][1]))
                 
                 reranked.sort(key=lambda x: x[0], reverse=True)
+                log("Reranking complete.", "success")
                 return reranked[:k]
             except Exception as e:
                 log(f"Reranking warn: {e}", "warn")

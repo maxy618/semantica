@@ -3,6 +3,7 @@ setup_system()
 import multiprocessing
 import argparse
 import sys
+import time
 from termcolor import cprint
 import config
 import storage
@@ -36,6 +37,7 @@ def resolve_model_name(raw_name, map_dict):
 
 
 def main():
+    start_time = time.perf_counter()
     args = get_args()
 
     if args.purge_model:
@@ -69,6 +71,16 @@ def main():
     main_model = resolve_model_name(args.model, config.MODELS_MAPPING)
     rerank_model = resolve_model_name(args.rerank_model, config.RERANK_MODELS_MAPPING)
     
+    threads, available_gb = get_hardware_info()
+    
+    cprint(f" {config.APP_NAME} CLI ", "white", "on_magenta", attrs=['bold'])
+    log(f"Parameters: {threads} threads, {available_gb:.1f}GB RAM available", "system")
+    log(f"Target: {args.path}", "system")
+    log(f"Model: {main_model}", "system")
+    if args.rerank:
+        log(f"Reranker: {rerank_model}", "system")
+    print()
+
     ignore_exts = set()
     if args.ignore:
         for ext in args.ignore.split(','):
@@ -79,14 +91,13 @@ def main():
                 ignore_exts.add(ext)
 
     storage.cleanup_old_indexes()
-    
-    threads, available_gb = get_hardware_info()
     models_dir = storage.get_models_dir()
     
     engine = SearchEngine(main_model, threads, available_gb, models_dir)
     vec_path, meta_path = storage.get_index_paths(args.path, main_model, args.chunk_size, args.overlap)
     
     if not engine.load_index(vec_path, meta_path):
+        log("Cache miss. Scanning files...", "warn")
         files = get_all_files(args.path, ignore_exts=ignore_exts, depth=args.depth)
         
         if not files:
@@ -101,10 +112,9 @@ def main():
             return
             
         engine.build_index(chunks, vec_path, meta_path)
-    else:
-        log("Index loaded from cache", "success")
 
-    log("Searching...", "info")
+    print()
+    log("Starting search sequence...", "info")
     
     results = engine.search(
         args.query, 
@@ -123,6 +133,10 @@ def main():
 
     for i, (score, res) in enumerate(results, 1):
         print_result(i, score, res)
+
+    elapsed = time.perf_counter() - start_time
+    print()
+    cprint(f" Finished in {elapsed:.3f}s ", "black", "on_white", attrs=['bold'])
 
 
 if __name__ == "__main__":
