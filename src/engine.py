@@ -24,19 +24,38 @@ class SearchEngine:
 
 
     def load_model(self):
-        if not self.model:
-            try:
-                if storage.model_exists(self.model_name):
-                    log(f"Loading embedding model: {self.model_name}...", "info")
-                else:
-                    log(f"Model {self.model_name} not found locally. Downloading...", "warn")
+        if self.model:
+            return
 
-                self.model = TextEmbedding(
-                    model_name=self.model_name, 
-                    threads=self.threads,
-                    cache_dir=self.cache_dir_models
-                )
-            except Exception as e:
+        try:
+            if storage.model_exists(self.model_name):
+                log(f"Loading embedding model: {self.model_name}...", "info")
+            else:
+                log(f"Model {self.model_name} not found locally. Downloading...", "warn")
+
+            self.model = TextEmbedding(
+                model_name=self.model_name, 
+                threads=self.threads,
+                cache_dir=self.cache_dir_models
+            )
+        except Exception as e:
+            err_str = str(e)
+            if "ONNXRuntimeError" in err_str or "NO_SUCHFILE" in err_str:
+                log(f"Model corruption detected: {e}", "error")
+                log("Purging corrupt model and retrying download...", "warn")
+                
+                storage.delete_model(self.model_name)
+                
+                try:
+                    self.model = TextEmbedding(
+                        model_name=self.model_name, 
+                        threads=self.threads,
+                        cache_dir=self.cache_dir_models
+                    )
+                    log("Model recovered successfully.", "success")
+                except Exception as e2:
+                    raise RuntimeError(f"Recovery failed: {e2}")
+            else:
                 raise RuntimeError(f"Embedding model init failed: {e}")
 
 
@@ -57,8 +76,27 @@ class SearchEngine:
             )
             self.ranker_name = ranker_model_name
         except Exception as e:
-            log(f"Reranker init failed: {e}", "warn")
-            self.ranker = None
+            err_str = str(e)
+            if "ONNXRuntimeError" in err_str or "NO_SUCHFILE" in err_str:
+                log(f"Reranker corruption detected: {e}", "error")
+                log("Purging corrupt reranker and retrying download...", "warn")
+                
+                storage.delete_model(ranker_model_name)
+                
+                try:
+                    self.ranker = TextCrossEncoder(
+                        model_name=ranker_model_name, 
+                        threads=self.threads,
+                        cache_dir=self.cache_dir_models
+                    )
+                    self.ranker_name = ranker_model_name
+                    log("Reranker recovered successfully.", "success")
+                except Exception as e2:
+                    log(f"Reranker recovery failed: {e2}", "warn")
+                    self.ranker = None
+            else:
+                log(f"Reranker init failed: {e}", "warn")
+                self.ranker = None
 
 
     def get_safe_batch_size(self):

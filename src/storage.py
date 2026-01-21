@@ -32,7 +32,7 @@ def _get_model_slug(model_name):
     return model_name
 
 
-def _find_model_paths(model_name):
+def _find_model_paths(model_name, check_integrity=True):
     if not os.path.exists(config.MODELS_DIR):
         return []
 
@@ -46,6 +46,10 @@ def _find_model_paths(model_name):
             continue
             
         if slug in item:
+            if not check_integrity:
+                found_paths.append(full_path)
+                continue
+
             has_onnx = False
             for root, _, files in os.walk(full_path):
                 if any(f.endswith('.onnx') for f in files):
@@ -59,12 +63,12 @@ def _find_model_paths(model_name):
 
 
 def model_exists(model_name):
-    paths = _find_model_paths(model_name)
+    paths = _find_model_paths(model_name, check_integrity=True)
     return len(paths) > 0
 
 
 def delete_model(model_name):
-    paths = _find_model_paths(model_name)
+    paths = _find_model_paths(model_name, check_integrity=False)
     deleted = False
     
     for path in paths:
