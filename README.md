@@ -1,7 +1,3 @@
-Here is a complete, detailed `README.md` for the **Semantica** project. It includes the architecture overview, installation, usage guide, model details, and the specific build instructions you requested.
-
-***
-
 # Semantica
 
 **Semantica** is a powerful, local command-line semantic search engine designed for developers. It allows you to search through your codebase, documents, and notes using natural language queries instead of exact keyword matching.
