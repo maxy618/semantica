@@ -1,4 +1,4 @@
-from utils import setup_system, log, print_result
+from utils import setup_system, log, print_result, delete_model_cache
 setup_system()
 import multiprocessing
 import argparse
@@ -17,6 +17,7 @@ def get_args():
     parser.add_argument('-C', '--chunk_size', type=int, default=config.DEFAULT_ARGS['chunk_size'])
     parser.add_argument('-o', '--overlap', type=float, default=config.DEFAULT_ARGS['overlap'])
     parser.add_argument('-i', '--ignore', type=str, default="", help="Comma separated extensions to ignore (e.g. csv,txt)")
+    parser.add_argument('-d', '--depth', type=int, default=None, help="Recursion depth (1 = current dir only)")
     parser.add_argument('--purge', action='store_true', help="Purge the vector index cache")
     parser.add_argument('-pm', '--purge-model', nargs='?', const='CURRENT', help="Delete model files. Can accept model name (e.g. -pm minilm)")
     parser.add_argument('-M', '--model', type=str, default=config.DEFAULT_ARGS['model'])
@@ -39,8 +40,10 @@ def main():
         else:
             main_model = target_raw
         
-        engine = SearchEngine(main_model)
-        engine.purge_model_cache()
+        if delete_model_cache(main_model):
+            log(f"Model files for '{main_model}' purged.", "success")
+        else:
+            log(f"No cache found for '{main_model}' to purge.", "warn")
         return
     
     if not args.path:
@@ -74,7 +77,7 @@ def main():
         engine.manage_cache(False, cache_dir)
         
         if not engine.load_index(vec_path, meta_path):
-            files = get_all_files(args.path, ignore_exts=ignore_exts)
+            files = get_all_files(args.path, ignore_exts=ignore_exts, depth=args.depth)
             
             if not files:
                 log("No files found (check path or ignored extensions)", "error")

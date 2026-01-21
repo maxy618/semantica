@@ -8,7 +8,7 @@ import faiss
 from tqdm import tqdm
 from fastembed import TextEmbedding
 from fastembed.rerank.cross_encoder import TextCrossEncoder
-from utils import log, get_hardware_info, check_model_cache, delete_model_cache, sigmoid
+from utils import log, get_hardware_info, check_model_cache, sigmoid
 
 
 class SearchEngine:
@@ -50,14 +50,6 @@ class SearchEngine:
         except Exception as e:
             log(f"Reranker init failed: {e}", "warn")
             self.ranker = None
-
-
-    def purge_model_cache(self, target_model=None):
-        model_to_delete = target_model if target_model else self.model_name
-        if delete_model_cache(model_to_delete):
-            log(f"Model files for '{model_to_delete}' purged.", "success")
-        else:
-            log(f"No cache found for '{model_to_delete}' to purge.", "warn")
 
 
     def get_safe_batch_size(self):

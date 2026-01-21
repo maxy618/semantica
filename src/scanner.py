@@ -6,7 +6,7 @@ from utils import log, log_file_error
 import xx_sent_ud_sm 
 
 
-def get_all_files(path, ignore_exts=None):
+def get_all_files(path, ignore_exts=None, depth=None):
     if ignore_exts is None:
         ignore_exts = set()
         
@@ -19,8 +19,15 @@ def get_all_files(path, ignore_exts=None):
         return [path] if reader.is_supported(path) else []
     
     file_list = []
+    base_depth = path.rstrip(os.sep).count(os.sep)
+
     for root, dirs, filenames in os.walk(path):
         dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith('.')]
+        
+        if depth is not None:
+            current_depth = root.rstrip(os.sep).count(os.sep) - base_depth
+            if current_depth + 1 >= depth:
+                dirs[:] = []
         
         for filename in filenames:
             if filename.startswith('.'):
