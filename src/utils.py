@@ -12,6 +12,7 @@ def setup_system():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     os.environ["LOGURU_LEVEL"] = "CRITICAL"
     logging.getLogger("fastembed").setLevel(logging.CRITICAL)
+    logging.getLogger("pypdf").setLevel(logging.CRITICAL)
     warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub")
     logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
