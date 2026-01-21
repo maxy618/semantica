@@ -1,20 +1,21 @@
 import os
+import sys
 import json
-import time
-import shutil
-import hashlib
 import numpy as np
 import faiss
 from tqdm import tqdm
 from fastembed import TextEmbedding
 from fastembed.rerank.cross_encoder import TextCrossEncoder
-from utils import log, get_hardware_info, check_model_cache, sigmoid
+from utils import log, sigmoid
+import storage
 
 
 class SearchEngine:
-    def __init__(self, model_name):
+    def __init__(self, model_name, threads, available_gb, cache_dir_models):
         self.model_name = model_name
-        self.threads, self.available_gb = get_hardware_info()
+        self.threads = threads
+        self.available_gb = available_gb
+        self.cache_dir_models = cache_dir_models
         self.model = None
         self.ranker = None
         self.ranker_name = None
@@ -25,12 +26,16 @@ class SearchEngine:
     def load_model(self):
         if not self.model:
             try:
-                if not check_model_cache(self.model_name):
-                    log(f"Model {self.model_name} not found. Downloading...", "warn")
+                if storage.model_exists(self.model_name):
+                    log(f"Loading embedding model: {self.model_name}...", "info")
                 else:
-                    log(f"Loading embedding model: {self.model_name} (Threads: {self.threads})...", "info")
-                
-                self.model = TextEmbedding(model_name=self.model_name, threads=self.threads)
+                    log(f"Model {self.model_name} not found locally. Downloading...", "warn")
+
+                self.model = TextEmbedding(
+                    model_name=self.model_name, 
+                    threads=self.threads,
+                    cache_dir=self.cache_dir_models
+                )
             except Exception as e:
                 raise RuntimeError(f"Embedding model init failed: {e}")
 
@@ -40,12 +45,16 @@ class SearchEngine:
             return
 
         try:
-            if not check_model_cache(ranker_model_name):
-                log(f"Reranker {ranker_model_name} not found. Downloading...", "warn")
-            else:
+            if storage.model_exists(ranker_model_name):
                 log(f"Loading reranker: {ranker_model_name}...", "info")
-                
-            self.ranker = TextCrossEncoder(model_name=ranker_model_name, threads=self.threads)
+            else:
+                log(f"Reranker {ranker_model_name} not found locally. Downloading...", "warn")
+
+            self.ranker = TextCrossEncoder(
+                model_name=ranker_model_name, 
+                threads=self.threads,
+                cache_dir=self.cache_dir_models
+            )
             self.ranker_name = ranker_model_name
         except Exception as e:
             log(f"Reranker init failed: {e}", "warn")
@@ -54,7 +63,6 @@ class SearchEngine:
 
     def get_safe_batch_size(self):
         available_gb = self.available_gb
-        
         is_heavy = 'nomic' in self.model_name or 'large' in self.model_name
         
         if available_gb > 16:
@@ -66,54 +74,13 @@ class SearchEngine:
         else:
             batch_size = 16
             
-        return batch_size, available_gb
-
-
-    def get_cache_paths(self, input_path, chunk_size, overlap):
-        app_data = os.getenv('LOCALAPPDATA')
-        if not app_data:
-            app_data = os.path.expanduser('~/.cache')
-            
-        cache_dir = os.path.join(app_data, 'VectorSearchProject', 'cache')
-        os.makedirs(cache_dir, exist_ok=True)
-        
-        abs_path = os.path.abspath(input_path)
-        params_str = f"{abs_path}_{self.model_name}_{chunk_size}_{overlap}"
-        params_hash = hashlib.md5(params_str.encode()).hexdigest()
-        
-        base_path = os.path.join(cache_dir, params_hash)
-        return base_path + ".npy", base_path + ".json", cache_dir
-
-
-    def manage_cache(self, purge_flag, cache_dir):
-        if purge_flag:
-            if os.path.exists(cache_dir):
-                try:
-                    shutil.rmtree(cache_dir)
-                    log("Cache purged", "success")
-                    return True
-                except Exception as e:
-                    log(f"Purge failed: {e}", "error")
-            return False
-            
-        if cache_dir and os.path.exists(cache_dir):
-            now = time.time()
-            max_age = 86400 * 7 
-            for filename in os.listdir(cache_dir):
-                fp = os.path.join(cache_dir, filename)
-                try:
-                    if os.path.isfile(fp) and (now - os.path.getmtime(fp) > max_age):
-                        os.remove(fp)
-                except OSError:
-                    pass
-        return False
+        return batch_size
 
 
     def load_index(self, vec_path, meta_path):
         if os.path.exists(vec_path) and os.path.exists(meta_path):
             try:
                 embeddings = np.load(vec_path)
-                
                 faiss.normalize_L2(embeddings)
 
                 with open(meta_path, 'r', encoding='utf-8') as f:
@@ -135,17 +102,18 @@ class SearchEngine:
         self.load_model()
         self.chunks = chunks
         
-        batch_size, free_mem = self.get_safe_batch_size()
-        log(f"Encoding {len(chunks)} chunks (Batch: {batch_size}, Free RAM: {free_mem:.1f}GB)...", "info")
+        batch_size = self.get_safe_batch_size()
+        log(f"Encoding {len(chunks)} chunks (Batch: {batch_size})...", "info")
         
         texts = [c["text_embed"] for c in chunks]
         embeddings_list = []
-        total_batches = (len(texts) + batch_size - 1) // batch_size
-
+        
         try:
             gen = self.model.embed(texts, batch_size=batch_size)
-            for vec_batch in tqdm(gen, total=total_batches, leave=False, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
-                embeddings_list.append(vec_batch)
+            
+            for vec in tqdm(gen, total=len(texts), file=sys.stdout, leave=False, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
+                embeddings_list.append(vec)
+                
         except Exception as e:
             log(f"Encoding process crashed: {e}", "error")
             log("Retrying with batch_size=1...", "warn")
@@ -153,14 +121,13 @@ class SearchEngine:
             embeddings_list = []
             try:
                 gen = self.model.embed(texts, batch_size=1)
-                for _, vec in tqdm(enumerate(gen), total=len(texts), leave=False):
+                for vec in tqdm(gen, total=len(texts), file=sys.stdout, leave=False):
                     embeddings_list.append(vec)
             except Exception as e2:
-                 log(f"Critical failure on chunk. Try cleaning your data or checking for minified files.", "error")
+                 log(f"Critical failure on chunk: {e2}", "error")
                  return
 
         embeddings = np.array(embeddings_list, dtype=np.float32)
-        
         faiss.normalize_L2(embeddings)
         
         np.save(vec_path, embeddings)

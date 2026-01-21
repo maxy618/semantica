@@ -1,10 +1,11 @@
-from utils import setup_system, log, print_result, delete_model_cache
+from utils import setup_system, log, print_result, get_hardware_info
 setup_system()
 import multiprocessing
 import argparse
 import sys
 from termcolor import cprint
 import config
+import storage
 from scanner import get_all_files, process_files
 from engine import SearchEngine
 
@@ -28,28 +29,46 @@ def get_args():
     return parser.parse_args()
 
 
+def resolve_model_name(raw_name, map_dict):
+    if raw_name in map_dict:
+        return map_dict[raw_name]
+    return raw_name
+
+
 def main():
     args = get_args()
 
     if args.purge_model:
         target_raw = args.model if args.purge_model == 'CURRENT' else args.purge_model
-        if target_raw in config.MODELS_MAPPING.keys():
-            main_model = config.MODELS_MAPPING.get(target_raw)
-        elif target_raw in config.RERANK_MODELS_MAPPING.keys():
-            main_model = config.RERANK_MODELS_MAPPING.get(target_raw)
-        else:
-            main_model = target_raw
         
-        if delete_model_cache(main_model):
-            log(f"Model files for '{main_model}' purged.", "success")
+        target_model = resolve_model_name(target_raw, config.MODELS_MAPPING)
+        if target_model == target_raw:
+             target_model = resolve_model_name(target_raw, config.RERANK_MODELS_MAPPING)
+        
+        if storage.delete_model(target_model):
+            log(f"Model files for '{target_model}' purged.", "success")
         else:
-            log(f"No cache found for '{main_model}' to purge.", "warn")
+            log(f"No cache found for '{target_model}' to purge.", "warn")
         return
-    
+
+    if args.purge:
+        if storage.purge_index_cache():
+            log("Vector index cache purged.", "success")
+        else:
+            log("Cache was empty or locked.", "warn")
+        return
+
     if not args.path:
         log("Argument -p/--path is required", "error")
         return
+        
+    if not args.query:
+        log("Argument -q/--query is required for search", "error")
+        return
 
+    main_model = resolve_model_name(args.model, config.MODELS_MAPPING)
+    rerank_model = resolve_model_name(args.rerank_model, config.RERANK_MODELS_MAPPING)
+    
     ignore_exts = set()
     if args.ignore:
         for ext in args.ignore.split(','):
@@ -59,61 +78,57 @@ def main():
                     ext = '.' + ext
                 ignore_exts.add(ext)
 
+    storage.cleanup_old_indexes()
+    
+    threads, available_gb = get_hardware_info()
+    models_dir = storage.get_models_dir()
+    
+    engine = SearchEngine(main_model, threads, available_gb, models_dir)
+    vec_path, meta_path = storage.get_index_paths(args.path, main_model, args.chunk_size, args.overlap)
+    
+    if not engine.load_index(vec_path, meta_path):
+        files = get_all_files(args.path, ignore_exts=ignore_exts, depth=args.depth)
+        
+        if not files:
+            log("No files found (check path or ignored extensions)", "error")
+            return
+
+        log(f"Processing {len(files)} files...", "info")
+        chunks = process_files(files, args.path, args)
+        
+        if not chunks:
+            log("No content extracted", "error")
+            return
+            
+        engine.build_index(chunks, vec_path, meta_path)
+    else:
+        log("Index loaded from cache", "success")
+
+    log("Searching...", "info")
+    
+    results = engine.search(
+        args.query, 
+        args.k, 
+        use_rerank=args.rerank, 
+        factor=args.factor,
+        rerank_model_name=rerank_model
+    )
+    
+    print()
+    cprint(f" Query: {args.query} ", "white", "on_blue", attrs=['bold'])
+    print()
+
+    if not results:
+        cprint("No results found.", "yellow")
+
+    for i, (score, res) in enumerate(results, 1):
+        print_result(i, score, res)
+
+
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
     try:
-        main_model = config.MODELS_MAPPING.get(args.model, args.model)
-        rerank_model = config.RERANK_MODELS_MAPPING.get(args.rerank_model, args.rerank_model)
-
-        engine = SearchEngine(main_model)
-        vec_path, meta_path, cache_dir = engine.get_cache_paths(args.path, args.chunk_size, args.overlap)
-        
-        if args.purge:
-            engine.manage_cache(True, cache_dir)
-            return
-        
-        if not args.query:
-            log("Argument -q/--query is required for search", "error")
-            return
-        
-        engine.manage_cache(False, cache_dir)
-        
-        if not engine.load_index(vec_path, meta_path):
-            files = get_all_files(args.path, ignore_exts=ignore_exts, depth=args.depth)
-            
-            if not files:
-                log("No files found (check path or ignored extensions)", "error")
-                return
-
-            log(f"Processing {len(files)} files...", "info")
-            chunks = process_files(files, args.path, args)
-            
-            if not chunks:
-                log("No content extracted", "error")
-                return
-                
-            engine.build_index(chunks, vec_path, meta_path)
-        else:
-            log("Index loaded from cache", "success")
-
-        log("Searching...", "info")
-        
-        results = engine.search(
-            args.query, 
-            args.k, 
-            use_rerank=args.rerank, 
-            factor=args.factor,
-            rerank_model_name=rerank_model
-        )
-        
-        print()
-        cprint(f" Query: {args.query} ", "white", "on_blue", attrs=['bold'])
-        print()
-
-        if not results:
-            cprint("No results found.", "yellow")
-
-        for i, (score, res) in enumerate(results, 1):
-            print_result(i, score, res)
-
+        main()
     except KeyboardInterrupt:
         print()
         log("Aborted", "warn")
@@ -121,8 +136,3 @@ def main():
     except Exception as e:
         log(f"Critical error: {e}", "error")
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    multiprocessing.freeze_support()
-    main()

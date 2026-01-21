@@ -1,3 +1,6 @@
+import os
+
+
 DEFAULT_ARGS = {
     'k': 3,
     'chunk_size': 500,
@@ -49,3 +52,14 @@ FILE_TYPES = {
         '.dockerfile', '.lua', '.pl', '.swift', '.kt',
     },
 }
+
+
+APP_NAME = "Semantica"
+LOCAL_APP_DATA = os.getenv('LOCALAPPDATA')
+if not LOCAL_APP_DATA:
+    LOCAL_APP_DATA = os.path.expanduser('~/.cache')
+
+
+BASE_DIR = os.path.join(LOCAL_APP_DATA, APP_NAME)
+MODELS_DIR = os.path.join(BASE_DIR, "models")
+CACHE_DIR = os.path.join(BASE_DIR, "cache")

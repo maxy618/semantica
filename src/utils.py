@@ -1,9 +1,7 @@
 import os
-import shutil
 import psutil
 import warnings
 import logging
-import tempfile
 import numpy as np
 from termcolor import cprint, colored
 
@@ -94,39 +92,3 @@ def print_result(rank, score, res):
     preview = format_preview(res['text_raw'], is_code=is_code)
     print(f"   {colored(preview, 'grey')}")
     print()
-
-
-def get_model_cache_roots():
-    roots = [os.path.join(os.path.expanduser("~"), ".cache", "fastembed")]
-    roots.append(os.path.join(tempfile.gettempdir(), "fastembed_cache"))
-    return roots
-
-
-def check_model_cache(model_name):
-    slug = model_name.split("/")[-1]
-    
-    for root in get_model_cache_roots():
-        if os.path.exists(root):
-            for d in os.listdir(root):
-                if slug in d:
-                    full_path = os.path.join(root, d)
-                    for _, _, files in os.walk(full_path):
-                        if "model.onnx" in files:
-                            return True
-    return False
-
-
-def delete_model_cache(model_name):
-    slug = model_name.split("/")[-1]
-    deleted = False
-    
-    for root in get_model_cache_roots():
-        if os.path.exists(root):
-            for d in os.listdir(root):
-                if slug in d:
-                    try:
-                        shutil.rmtree(os.path.join(root, d))
-                        deleted = True
-                    except Exception:
-                        pass
-    return deleted
