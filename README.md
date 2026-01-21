@@ -38,8 +38,8 @@ It allows you to search through complex codebases, documentation, and notes usin
 *   **High Performance Stack:**
     *   **FastEmbed:** Quantized ONNX runtime for blazing fast inference.
     *   **FAISS:** Facebook AI Similarity Search for sub-millisecond vector lookups.
-    *   **Multiprocessing:** Parallel file scanning and chunking.
-*   **Two-Stage Pipeline:** Uses lightweight embeddings for retrieval and heavy Cross-Encoders for high-precision reranking.
+    *   **Multiprocessing:** Parallel file encoding.
+*   **Two-Stage Pipeline:** Uses lightweight embeddings for retrieval and heavy Cross-Encoders for high-precision reranking (optional).
 *   **Smart Caching:** Hashes content and model parameters to prevent re-indexing unchanged files.
 
 ---
@@ -169,6 +169,7 @@ semantica -p D:\projects\forex-prediction-bot\ -q "a function that recalculates 
 | **Chunk Size** | `-C` | `500` | Max characters per chunk. Smaller = more precise context. |
 | **Overlap** | `-o` | `0.5` | Percentage (0.0-1.0) of overlap between chunks. |
 | **Ignore** | `-i` | `""` | Extensions to skip (e.g. `csv,log,txt`). |
+| **Depth** | `-d` | `None` | Recursion depth (1 = current dir only). |
 | **Purge Cache**| `--purge` | `False` | Force rebuild of the index for the current path. |
 | **Purge Model**| `-pm` | `None` | Delete model files from disk. |
 
