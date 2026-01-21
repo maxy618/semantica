@@ -124,45 +124,7 @@ semantica -M bge-s --purge-model
 
 Semantica provides clean, readable output with syntax highlighting and relevance scores.
 
-```text
-> semantica -p D:\projects\ -q "a function creates an animation from images" -k 2 -i csv,md --rerank -C 1000
- Semantica CLI 
-[SYSTEM] Parameters: 20 threads, 9.1GB RAM available
-[SYSTEM] Target: D:\projects\
-[SYSTEM] Model: BAAI/bge-small-en-v1.5
-[SYSTEM] Reranker: jinaai/jina-reranker-v2-base-multilingual
-
-[WARN] Cache miss. Scanning files...
-[INFO] Processing 18 files...
-[INFO] Loading embedding model: BAAI/bge-small-en-v1.5...
-[INFO] Encoding 309 chunks (Batch: 128)...
-[SUCCESS] Index built and saved to cache.
-
-[INFO] Starting search sequence...
-[INFO] Vectorizing query...
-[INFO] Retrieved 10 candidates. Initializing reranker...
-[INFO] Loading reranker: jinaai/jina-reranker-v2-base-multilingual...
-[SUCCESS] Reranking complete.
-
- Query: a function creates an animation from images 
-
-1.  27.31%  forex-prediction-bot\src\plotter.py : Lines 77-104
-   def add_motion_trail(base_img, forward_img, progress):
-       w, h = base_img.size
-       trail = Image.new("RGBA", (w, h), (0,0,0,0))
-       for i in range(TRAIL_SAMPLES):
-
-2.  27.05%  forex-prediction-bot\src\plotter.py : Lines 91-117
-           trail.paste(tmp, (dx,0), tmp)
-       return Image.alpha_composite(base_img, trail)
-   def build_transition_frames(img_a, img_b):
-       frames = []
-
-
- Finished in 62.441s 
-
->
-```
+![Semantica CLI Demo](assets/demo.png)
 
 **Note:** The percentage score represents the semantic similarity.
 *   **Green Pill:** High confidence (>75%)
