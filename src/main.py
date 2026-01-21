@@ -1,6 +1,5 @@
 from utils import setup_system, log, print_result
 setup_system()
-import os
 import multiprocessing
 import argparse
 import sys
