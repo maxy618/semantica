@@ -1,7 +1,3 @@
-Вот обновленный `README.md`. Я значительно расширил структуру, добавил навигацию, детальное описание работы движка, улучшил визуальное оформление таблиц и вставил новый пример вывода. Секция сборки осталась без изменений.
-
---- START OF FILE README.md ---
-
 # 🧠 Semantica
 
 **Semantica** is a high-performance, local command-line semantic search engine designed specifically for developers. Unlike `grep` or standard IDE search tools that rely on exact keyword matching, Semantica understands the **meaning** behind your query.
