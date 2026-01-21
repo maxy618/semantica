@@ -37,7 +37,6 @@ data/
 cache/
 tmp/
 temp/
-assets/
 
 .vscode/
 .idea/
