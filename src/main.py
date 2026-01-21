@@ -12,13 +12,14 @@ from engine import SearchEngine
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-p', '--path', type=str, required=True)
-    parser.add_argument('-q', '--query', type=str, required=True)
+    parser.add_argument('-p', '--path', type=str)
+    parser.add_argument('-q', '--query', type=str)
     parser.add_argument('-k', '--k', type=int, default=config.DEFAULT_ARGS['k'])
     parser.add_argument('-C', '--chunk_size', type=int, default=config.DEFAULT_ARGS['chunk_size'])
     parser.add_argument('-o', '--overlap', type=float, default=config.DEFAULT_ARGS['overlap'])
     parser.add_argument('-i', '--ignore', type=str, default="", help="Comma separated extensions to ignore (e.g. csv,txt)")
-    parser.add_argument('--purge', action='store_true')
+    parser.add_argument('--purge', action='store_true', help="Purge the vector index cache")
+    parser.add_argument('-pm', '--purge-model', nargs='?', const='CURRENT', help="Delete model files. Can accept model name (e.g. -pm minilm)")
     parser.add_argument('-M', '--model', type=str, default=config.DEFAULT_ARGS['model'])
     parser.add_argument('-rM', '--rerank_model', type=str,default=config.DEFAULT_ARGS['rerank_model'])
     parser.add_argument('--rerank', action='store_true', help="Enable reranking step (disabled by default)")
@@ -29,9 +30,22 @@ def get_args():
 
 def main():
     args = get_args()
+
+    if args.purge_model:
+        target_raw = args.model if args.purge_model == 'CURRENT' else args.purge_model
+        if target_raw in config.MODELS_MAPPING.keys():
+            main_model = config.MODELS_MAPPING.get(target_raw)
+        elif target_raw in config.RERANK_MODELS_MAPPING.keys():
+            main_model = config.RERANK_MODELS_MAPPING.get(target_raw)
+        else:
+            main_model = target_raw
+        
+        engine = SearchEngine(main_model)
+        engine.purge_model_cache()
+        return
     
-    if not os.path.exists(args.path):
-        log(f"Path not found: {args.path}", "error")
+    if not args.path:
+        log("Argument -p/--path is required", "error")
         return
 
     ignore_exts = set()
@@ -48,11 +62,14 @@ def main():
         rerank_model = config.RERANK_MODELS_MAPPING.get(args.rerank_model, args.rerank_model)
 
         engine = SearchEngine(main_model)
-        
         vec_path, meta_path, cache_dir = engine.get_cache_paths(args.path, args.chunk_size, args.overlap)
         
         if args.purge:
             engine.manage_cache(True, cache_dir)
+            return
+        
+        if not args.query:
+            log("Argument -q/--query is required for search", "error")
             return
         
         engine.manage_cache(False, cache_dir)

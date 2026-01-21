@@ -1,6 +1,10 @@
 import os
+import shutil
 import psutil
 import warnings
+import logging
+import tempfile
+import numpy as np
 from termcolor import cprint, colored
 
 
@@ -9,6 +13,7 @@ def setup_system():
     os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub")
+    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
 
 def get_hardware_info():
@@ -22,6 +27,10 @@ def get_hardware_info():
         available_gb = 8
         
     return threads, available_gb
+
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
 
 
 def log(msg, level="info"):
@@ -60,17 +69,62 @@ def format_preview(text, is_code=False, max_lines=4, max_width=100):
 
 
 def print_result(rank, score, res):
-    score_str = f"[{score:.4f}]"
+    if score > 0.75:
+        bg_color = "on_green"
+    elif score > 0.5:
+        bg_color = "on_yellow"
+    else:
+        bg_color = "on_red"
+
+    score_str = f" {score:.2%} "
+    score_pill = colored(score_str, "white", bg_color, attrs=['bold'])
+    
     path_str = colored(res.get('path', 'unknown'), "cyan", attrs=['underline'])
     is_code = (res.get('type') == 'code')
     
     if is_code:
         meta = colored(f"Lines {res['lines']}", "yellow")
-        header = f"{score_str} {path_str} : {meta}"
+        header = f"{score_pill} {path_str} : {meta}"
     else:
-        header = f"{score_str} {path_str}"
+        header = f"{score_pill} {path_str}"
         
     print(f"{rank}. {header}")
     preview = format_preview(res['text_raw'], is_code=is_code)
     print(f"   {colored(preview, 'grey')}")
     print()
+
+
+def get_model_cache_roots():
+    roots = [os.path.join(os.path.expanduser("~"), ".cache", "fastembed")]
+    roots.append(os.path.join(tempfile.gettempdir(), "fastembed_cache"))
+    return roots
+
+
+def check_model_cache(model_name):
+    slug = model_name.split("/")[-1]
+    
+    for root in get_model_cache_roots():
+        if os.path.exists(root):
+            for d in os.listdir(root):
+                if slug in d:
+                    full_path = os.path.join(root, d)
+                    for _, _, files in os.walk(full_path):
+                        if "model.onnx" in files:
+                            return True
+    return False
+
+
+def delete_model_cache(model_name):
+    slug = model_name.split("/")[-1]
+    deleted = False
+    
+    for root in get_model_cache_roots():
+        if os.path.exists(root):
+            for d in os.listdir(root):
+                if slug in d:
+                    try:
+                        shutil.rmtree(os.path.join(root, d))
+                        deleted = True
+                    except Exception:
+                        pass
+    return deleted

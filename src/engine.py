@@ -5,9 +5,10 @@ import shutil
 import hashlib
 import numpy as np
 import faiss
+from tqdm import tqdm
 from fastembed import TextEmbedding
 from fastembed.rerank.cross_encoder import TextCrossEncoder
-from utils import log, get_hardware_info
+from utils import log, get_hardware_info, check_model_cache, delete_model_cache, sigmoid
 
 
 class SearchEngine:
@@ -24,7 +25,11 @@ class SearchEngine:
     def load_model(self):
         if not self.model:
             try:
-                log(f"Loading embedding model: {self.model_name} (Threads: {self.threads})...", "info")
+                if not check_model_cache(self.model_name):
+                    log(f"Model {self.model_name} not found. Downloading...", "warn")
+                else:
+                    log(f"Loading embedding model: {self.model_name} (Threads: {self.threads})...", "info")
+                
                 self.model = TextEmbedding(model_name=self.model_name, threads=self.threads)
             except Exception as e:
                 raise RuntimeError(f"Embedding model init failed: {e}")
@@ -35,7 +40,11 @@ class SearchEngine:
             return
 
         try:
-            log(f"Loading reranker: {ranker_model_name}...", "info")
+            if not check_model_cache(ranker_model_name):
+                log(f"Reranker {ranker_model_name} not found. Downloading...", "warn")
+            else:
+                log(f"Loading reranker: {ranker_model_name}...", "info")
+                
             self.ranker = TextCrossEncoder(model_name=ranker_model_name, threads=self.threads)
             self.ranker_name = ranker_model_name
         except Exception as e:
@@ -43,8 +52,15 @@ class SearchEngine:
             self.ranker = None
 
 
+    def purge_model_cache(self, target_model=None):
+        model_to_delete = target_model if target_model else self.model_name
+        if delete_model_cache(model_to_delete):
+            log(f"Model files for '{model_to_delete}' purged.", "success")
+        else:
+            log(f"No cache found for '{model_to_delete}' to purge.", "warn")
+
+
     def get_safe_batch_size(self):
-        """works on my machine"""
         available_gb = self.available_gb
         
         is_heavy = 'nomic' in self.model_name or 'large' in self.model_name
@@ -105,6 +121,9 @@ class SearchEngine:
         if os.path.exists(vec_path) and os.path.exists(meta_path):
             try:
                 embeddings = np.load(vec_path)
+                
+                faiss.normalize_L2(embeddings)
+
                 with open(meta_path, 'r', encoding='utf-8') as f:
                     self.chunks = json.load(f)
                 
@@ -128,25 +147,29 @@ class SearchEngine:
         log(f"Encoding {len(chunks)} chunks (Batch: {batch_size}, Free RAM: {free_mem:.1f}GB)...", "info")
         
         texts = [c["text_embed"] for c in chunks]
-
         embeddings_list = []
+        total_batches = (len(texts) + batch_size - 1) // batch_size
 
         try:
-            for vec in self.model.embed(texts, batch_size=batch_size):
-                embeddings_list.append(vec)
+            gen = self.model.embed(texts, batch_size=batch_size)
+            for vec_batch in tqdm(gen, total=total_batches, leave=False, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'):
+                embeddings_list.append(vec_batch)
         except Exception as e:
             log(f"Encoding process crashed: {e}", "error")
-
             log("Retrying with batch_size=1...", "warn")
+            
             embeddings_list = []
             try:
-                for _, vec in enumerate(self.model.embed(texts, batch_size=1)):
+                gen = self.model.embed(texts, batch_size=1)
+                for _, vec in tqdm(enumerate(gen), total=len(texts), leave=False):
                     embeddings_list.append(vec)
             except Exception as e2:
                  log(f"Critical failure on chunk. Try cleaning your data or checking for minified files.", "error")
                  return
 
         embeddings = np.array(embeddings_list, dtype=np.float32)
+        
+        faiss.normalize_L2(embeddings)
         
         np.save(vec_path, embeddings)
         with open(meta_path, 'w', encoding='utf-8') as f:
@@ -167,6 +190,8 @@ class SearchEngine:
         query_vec = list(self.model.embed([query]))[0].astype(np.float32)
         query_vec = query_vec.reshape(1, -1)
         
+        faiss.normalize_L2(query_vec)
+        
         D, I = self.index.search(query_vec, initial_k)
         
         candidates = []
@@ -182,11 +207,12 @@ class SearchEngine:
         if self.ranker:
             try:
                 cand_texts = [c[1]['text_raw'] for c in candidates]
-                scores = list(self.ranker.rerank(query, cand_texts))
+                raw_scores = list(self.ranker.rerank(query, cand_texts))
                 
                 reranked = []
-                for idx, score in enumerate(scores):
-                    reranked.append((score, candidates[idx][1]))
+                for idx, raw_score in enumerate(raw_scores):
+                    prob_score = sigmoid(raw_score)
+                    reranked.append((prob_score, candidates[idx][1]))
                 
                 reranked.sort(key=lambda x: x[0], reverse=True)
                 return reranked[:k]
