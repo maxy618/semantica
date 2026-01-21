@@ -137,6 +137,7 @@ def main():
     elapsed = time.perf_counter() - start_time
     print()
     cprint(f" Finished in {elapsed:.3f}s ", "black", "on_white", attrs=['bold'])
+    print()
 
 
 if __name__ == "__main__":
