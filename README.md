@@ -195,7 +195,7 @@ $env:PYTHONPATH='src'; python -m nuitka --standalone --onefile --mingw64 `
     --nofollow-import-to=pytest `
     --nofollow-import-to=tkinter `
     --output-filename=semantica.exe `
-    src/semantica/main.py
+    entry.py
 ```
 
 ### Linux
@@ -221,7 +221,7 @@ PYTHONPATH=src python3 -m nuitka \
   --nofollow-import-to=pytest \
   --nofollow-import-to=tkinter \
   --output-filename=semantica_linux \
-  src/semantica/main.py
+  entry.py
 ```
 
 ---
