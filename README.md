@@ -176,8 +176,7 @@ To build a standalone executable that includes all dependencies and has good per
 
 ### Windows (PowerShell)
 ```powershell
-python -m nuitka --standalone --onefile --mingw64 `
-    --include-path=src `
+$env:PYTHONPATH='src'; python -m nuitka --standalone --onefile --mingw64 `
     --include-package=semantica `
     --include-package=fastembed `
     --include-package=faiss `
