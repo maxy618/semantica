@@ -172,7 +172,7 @@ Rerankers are used only if `--rerank` is enabled.
 
 ## Building from Source
 
-To build a standalone executable that includes all dependencies has good performance, you **must** use **Nuitka** with the specific flags below.
+To build a standalone executable that includes all dependencies and has good performance, you **must** use **Nuitka** with the specific flags below.
 
 ### Windows (PowerShell)
 ```powershell
