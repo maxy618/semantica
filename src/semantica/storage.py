@@ -2,7 +2,7 @@ import os
 import shutil
 import hashlib
 import time
-import config
+from . import config
 
 
 def ensure_dirs():

@@ -1,7 +1,7 @@
 import os
 import pypdf
 import docx
-from config import FILE_TYPES
+from .config import FILE_TYPES
 
 
 class FileReader:

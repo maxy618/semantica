@@ -1,14 +1,14 @@
-from utils import setup_system, log, print_result, get_hardware_info
+from .utils import setup_system, log, print_result, get_hardware_info
 setup_system()
 import multiprocessing
 import argparse
 import sys
 import time
 from termcolor import cprint
-import config
-import storage
-from scanner import get_all_files, process_files
-from engine import SearchEngine
+from . import config
+from . import storage
+from .scanner import get_all_files, process_files
+from .engine import SearchEngine
 
 
 def get_args():

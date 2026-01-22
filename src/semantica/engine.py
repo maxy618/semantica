@@ -6,8 +6,8 @@ import faiss
 from tqdm import tqdm
 from fastembed import TextEmbedding
 from fastembed.rerank.cross_encoder import TextCrossEncoder
-from utils import log, sigmoid
-import storage
+from .utils import log, sigmoid
+from . import storage
 
 
 class SearchEngine:

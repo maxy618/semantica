@@ -9,7 +9,7 @@ description = "Semantic search engine tool"
 requires-python = ">=3.9"
 dependencies = [
     "numpy",
-    "faiss-cpu",  # faiss-gpu
+    "faiss-cpu",
     "fastembed",
     "spacy",
     "termcolor",
@@ -19,8 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-semantica = "src.main:main"
+semantica = "semantica.main:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
+where = ["src"]

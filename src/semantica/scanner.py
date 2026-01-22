@@ -1,8 +1,8 @@
 import os
 import psutil
-from config import IGNORE_DIRS
-from reader import FileReader
-from utils import log, log_file_error
+from .config import IGNORE_DIRS
+from .reader import FileReader
+from .utils import log, log_file_error
 import xx_sent_ud_sm 
 
 
