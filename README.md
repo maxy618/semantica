@@ -43,7 +43,7 @@ It is also really useful for finding PDFs, DOCX and txt files with non-descripti
 | **Indexing** | None (Real-time) | Required (Cached locally via FAISS) |
 | **Speed** | Instant | Slower (requires model inference) |
 | **Hardware usage** | Minimal | High |
-| **Best for** | Known error codes, variable names, patterns. | Logic discovery, vague queries, "unknown unknowns". |
+| **Best for** | Known error codes, variable names, patterns. | Logic discovery, vague queries |
 
 **Performance Note:** Semantica runs 100% locally. The first time you run it on a directory, it must scan, chunk, and embed the files. On large repositories, this will take time. Subsequent searches use the cached index and take seconds.
 
