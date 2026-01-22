@@ -201,10 +201,9 @@ python -m nuitka --standalone --onefile --mingw64 `
 
 ### Linux
 ```bash
-python3 -m nuitka \
+PYTHONPATH=src python3 -m nuitka \
   --standalone \
   --onefile \
-  --include-path=src \
   --include-package=semantica \
   --include-package=fastembed \
   --include-package=faiss \
@@ -222,7 +221,7 @@ python3 -m nuitka \
   --nofollow-import-to=IPython \
   --nofollow-import-to=pytest \
   --nofollow-import-to=tkinter \
-  --output-filename=semantica \
+  --output-filename=semantica_linux \
   src/semantica/main.py
 ```
 
