@@ -166,7 +166,7 @@ Rerankers are used only if `--rerank` is enabled.
 | :--- | :--- | :--- |
 | **`jina-v2`** | `jina-reranker-v2-base-multilingual` | **Default.** good balance of speed and accuracy |
 | **`bge-r-b`** | `bge-reranker-base` | Worked really bad in some scenarios |
-| **`bge-r-l`** | `bge-reranker-large` | More accurate, but i still won't reccomend to use it tbh |
+| **`bge-r-l`** | `bge-reranker-large` | More accurate, but i still won't recommend to use it tbh |
 
 ---
 
