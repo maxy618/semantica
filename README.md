@@ -25,7 +25,7 @@ When working with legacy code or large monoliths, you often know *what* a functi
 ### 2. Pseudocode Search
 You can describe the structure of the code you expect to find using pseudocode.
 *   **Scenario:** You remember a specific UI toggle logic involving a media state.
-*   **Query:** `-q "show animation if toggle == animation else show image"`
+*   **Query:** `"show animation if toggle == animation else show image"`
 *   **Result:** Finds the exact conditional logic block in the source code.
 
 ![Pseudocode Search](assets/demo2.png)
